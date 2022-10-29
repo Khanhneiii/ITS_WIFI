@@ -4,7 +4,6 @@
 #include "DHT.h"
 #include "Waveshare_SIM7600.h"
 #include <Arduino_JSON.h>
-#include "cam.h"
 #include "fastled.h"
 #include "esp_timer.h"
 #include "readPIN.h"
@@ -13,14 +12,14 @@
 #include <HTTPClient.h>
 #include "RTC.h"
 #include "HTTP_FIREBASE.h"
+#include "cam.h"
 
 #define MQTT_SERVER "test.mosquitto.org"
 #define MQTT_PORT 1883
 
-const char* ssid = "3 Thang";
-const char* password = "123bathang";
+const char* ssid = "KTMT - SinhVien";
+const char* password = "sinhvien";
 
-String HTTPServer = "https://inset-catch-electric.herokuapp.com/updateDeviceData";
 
 
 
@@ -43,15 +42,15 @@ String ID = "save";
 #define uS_TO_S_FACTOR 1000000ULL
 
 
-WiFiClient wifiClient;
-PubSubClient MQTTClient(wifiClient);
+//WiFiClient wifiClient;
+//PubSubClient MQTTClient(wifiClient);
 
 
 
 // GPS variable
 //String strLat, strLog, strTime, Date;
-String hexled = "0xFF0000";
-int brightness = 0;
+String hexled = "0xFF00FF";
+int brightness = 100;
 DHT dht(DHTPIN, DHTTYPE);
 JSONVar PACKET;
 JSONVar GPS;
@@ -66,7 +65,7 @@ int current_time = 650;
 //timer set up
 esp_timer_create_args_t periodic_timer_args;
 esp_timer_handle_t periodic_timer;
-int timer_value = 40;
+int timer_value = 20;
 int wakeup_time = 0;
 int sleep_time = 620;
 bool is_timer_start = false;
@@ -77,22 +76,30 @@ int MessStatus = 0;
 
 String MQTTMess = "";
 
+String URL = "https://inset-catch-electric.herokuapp.com/updateDeviceData";
+
+void SendDataFB(WiFiClient wifi,String buff) {
+  HTTPClient http;
+  http.begin(URL);
+  http.addHeader("Content-Type","application/json");
+  int responeCode = http.POST(buff);
+  Serial.println(responeCode);
+}
+
 void Get_SendDataSensor()
 {
-  PIN_FUNC_SELECT(PERIPHS_IO_MUX_U0TXD_U, FUNC_U0TXD_U0TXD);
-  PIN_FUNC_SELECT(PERIPHS_IO_MUX_U0RXD_U, FUNC_U0RXD_U0RXD);
   PACKET["id"] = ID;
   float h = dht.readHumidity();
-  Data["humi"] = 10;
+  Data["humi"] = h;
 
   float t = dht.readTemperature();
-  Data["temp"] = 15;
+  Data["temp"] = t;
 
   //get image
  // Data["img"] = Photo2Base64();
 
   float light = 15;
-  Data["optic"] = 14;
+  Data["optic"] = light;
 
   //  GPS read data
 //  sim7600.GPSPositioning(Lat, Log, Date, Time);
@@ -110,12 +117,12 @@ void Get_SendDataSensor()
 //    //GPS["Date"] = Date;
 //  }
 
-  Data["coordinates"] = GPS;
-  Data["battery"] = String(Energy());
+//  Data["coordinates"] = GPS;
+  Data["battery"] = 83;
   Data["rain"] = isRaining;
   Data["statusGrid"] = GridStatus;
   PACKET["data"] = Data;
-  SendDataFB(wifiClient,JSON.stringify(PACKET));
+//  SendDataFB(wifiClient,"{\"id\":\"save\",\"data\":{\"desc\":\"khanhbangdan\",\"battery\":83,\"humi\":34,\"temp\":34,\"optic\":163,\"rain\":false,\"statusGrid\":true}}");
 
 }
 
@@ -133,22 +140,22 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
-void connect_to_broker() {
-  while (!MQTTClient.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    String clientId = "save";
-    clientId += String(random(0xffff), HEX);
-    if (MQTTClient.connect(clientId.c_str())) {
-      Serial.println("connected");
-      MQTTClient.subscribe(TOPIC);
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(MQTTClient.state());
-      Serial.println(" try again in 2 seconds");
-      delay(2000);
-    }
-  }
-}
+//void connect_to_broker() {
+//  while (!MQTTClient.connected()) {
+//    Serial.print("Attempting MQTT connection...");
+//    String clientId = "save";
+//    clientId += String(random(0xffff), HEX);
+//    if (MQTTClient.connect(clientId.c_str())) {
+//      Serial.println("connected");
+//      MQTTClient.subscribe(TOPIC);
+//    } else {
+//      Serial.print("failed, rc=");
+//      Serial.print(MQTTClient.state());
+//      Serial.println(" try again in 2 seconds");
+//      delay(2000);
+//    }
+//  }
+//}
 
 void callback(char* topic, byte *payload, unsigned int length) {
   char status[20];
@@ -168,11 +175,11 @@ void callback(char* topic, byte *payload, unsigned int length) {
   else if (MQTTMess.indexOf(UPDATE)) MessStatus = 3;
 }
 
-void setup_MQTT() {
-  MQTTClient.setServer(MQTT_SERVER, MQTT_PORT);
-  MQTTClient.setCallback(callback);
-  connect_to_broker();
-}
+//void setup_MQTT() {
+////  MQTTClient.setServer(MQTT_SERVER, MQTT_PORT);
+//  MQTTClient.setCallback(callback);
+//  connect_to_broker();
+//}
 
 void SendImage2FB(String mess) {
   JSONVar Image;
@@ -254,7 +261,6 @@ void periodic_timer_callback(void* arg)
     int64_t time_since_boot = esp_timer_get_time();
     printf("Periodic timer called, time since boot: %lld us\n", time_since_boot);
     Get_SendDataSensor();
-    if (GetLocalTime() > sleep_time) flagsleep = true;
 }
 
 esp_sleep_wakeup_cause_t sleep() {
@@ -278,10 +284,11 @@ esp_sleep_wakeup_cause_t sleep() {
 void setup() {
   Serial.begin(115200);
   dht.begin();
-  setup_wifi();
+//  setup_wifi();
   camera_init();
   delay(15000);
-  setup_MQTT();
+//  setup_MQTT();
+
   setup_fastled();
   Config_led(hexled, brightness);
   setup_rtc();
@@ -328,7 +335,7 @@ void loop() {
       ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, timer_value * uS_TO_S_FACTOR));
       is_timer_start = true;
     }
-    if (MessStatus == 1) Get_SendDataSensor();
+//    if (MessStatus == 1) Get_SendDataSensor();
     else if (MessStatus == 2);
     else if (MessStatus == 3) update_data(MQTTMess);
     int rain = digitalRead(RAINPIN);

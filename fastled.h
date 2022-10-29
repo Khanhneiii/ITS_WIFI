@@ -4,7 +4,7 @@
 #define NUM_LEDS    16
 #define BRIGHTNESS  64
 #define LED_TYPE    WS2812
-#define COLOR_ORDER GRB
+#define COLOR_ORDER RGB
 CRGB leds[NUM_LEDS];
 
 #define UPDATES_PER_SECOND 100
